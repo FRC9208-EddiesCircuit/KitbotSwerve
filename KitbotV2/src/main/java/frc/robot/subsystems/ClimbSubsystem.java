@@ -18,7 +18,10 @@ public class ClimbSubsystem extends SubsystemBase {
 
     public ClimbSubsystem() {
         leftClimbConfiguration.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
+        leftClimbConfiguration.MotorOutput.NeutralMode = NeutralModeValue.Brake;
+
         rightClimbConfiguration.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
+        rightClimbConfiguration.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     }
 
     public void leftClimbMove(double rotationSpeed) {

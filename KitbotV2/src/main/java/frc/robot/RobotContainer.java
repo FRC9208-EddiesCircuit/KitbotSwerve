@@ -10,15 +10,18 @@ import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
 import com.ctre.phoenix6.swerve.SwerveRequest;
 
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
+import frc.robot.commands.ClimbCmd;
 import frc.robot.commands.IntakeCmd;
 import frc.robot.commands.ShootCmd;
 import frc.robot.commands.ReverseIntakeCmd;
 import frc.robot.generated.TunerConstants;
+import frc.robot.subsystems.ClimbSubsystem;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.subsystems.DeflectorSubsystem;
 import frc.robot.subsystems.IntakeShooterSubsystem;
@@ -30,6 +33,7 @@ public class RobotContainer {
     
     private IntakeShooterSubsystem intakeShooterSubsystem = new IntakeShooterSubsystem();
     private DeflectorSubsystem deflectorSubsystem = new DeflectorSubsystem();
+    private ClimbSubsystem climbSubsystem = new ClimbSubsystem();
 
     /* Setting up bindings for necessary control of the swerve drive platform */
     private final SwerveRequest.FieldCentric drive = new SwerveRequest.FieldCentric()
@@ -40,7 +44,9 @@ public class RobotContainer {
 
     private final Telemetry logger = new Telemetry(MaxSpeed);
 
-    private final CommandXboxController joystick = new CommandXboxController(0);
+    private final CommandXboxController controller = new CommandXboxController(0);
+    private final Joystick driveJS = new Joystick(2);
+    private final Joystick twistJS = new Joystick(1);
 
     public final CommandSwerveDrivetrain drivetrain = TunerConstants.createDrivetrain();
 
@@ -54,9 +60,9 @@ public class RobotContainer {
         drivetrain.setDefaultCommand(
             // Drivetrain will execute this command periodically
             drivetrain.applyRequest(() ->
-                drive.withVelocityX(-joystick.getLeftY() * MaxSpeed) // Drive forward with negative Y (forward)
-                    .withVelocityY(-joystick.getLeftX() * MaxSpeed) // Drive left with negative X (left)
-                    .withRotationalRate(-joystick.getRightX() * MaxAngularRate) // Drive counterclockwise with negative X (left)
+                drive.withVelocityX(driveJS.getRawAxis(1) * MaxSpeed) // Drive forward with negative Y (forward)
+                    .withVelocityY(driveJS.getRawAxis(0) * MaxSpeed) // Drive left with negative X (left)
+                    .withRotationalRate(-twistJS.getRawAxis(2) * MaxAngularRate) // Drive counterclockwise with negative X (left)
             )
         );
 
@@ -67,25 +73,28 @@ public class RobotContainer {
             drivetrain.applyRequest(() -> idle).ignoringDisable(true)
         );
 
-        joystick.x().whileTrue(drivetrain.applyRequest(() -> brake));
-        joystick.y().whileTrue(drivetrain.applyRequest(() ->
-            point.withModuleDirection(new Rotation2d(-joystick.getLeftY(), -joystick.getLeftX()))
+        controller.x().whileTrue(drivetrain.applyRequest(() -> brake));
+        controller.y().whileTrue(drivetrain.applyRequest(() ->
+            point.withModuleDirection(new Rotation2d(-controller.getLeftY(), -controller.getLeftX()))
         ));
 
-        joystick.axisGreaterThan(2, 0.5)
+        controller.axisGreaterThan(2, 0.5)
             .whileTrue(new IntakeCmd(intakeShooterSubsystem, deflectorSubsystem));
-        joystick.a().whileTrue(new ShootCmd(intakeShooterSubsystem, deflectorSubsystem));
-        joystick.b().whileTrue(new ReverseIntakeCmd(intakeShooterSubsystem, deflectorSubsystem));
+        controller.a().whileTrue(new ShootCmd(intakeShooterSubsystem, deflectorSubsystem));
+        controller.b().whileTrue(new ReverseIntakeCmd(intakeShooterSubsystem, deflectorSubsystem));
+        controller.rightBumper().whileTrue(new ClimbCmd(climbSubsystem,
+                                                            () -> controller.getLeftY(),
+                                                            () -> controller.getRightY()));
 
         // Run SysId routines when holding back/start and X/Y.
         // Note that each routine should be run exactly once in a single log.
-        joystick.back().and(joystick.y()).whileTrue(drivetrain.sysIdDynamic(Direction.kForward));
-        joystick.back().and(joystick.x()).whileTrue(drivetrain.sysIdDynamic(Direction.kReverse));
-        joystick.start().and(joystick.y()).whileTrue(drivetrain.sysIdQuasistatic(Direction.kForward));
-        joystick.start().and(joystick.x()).whileTrue(drivetrain.sysIdQuasistatic(Direction.kReverse));
+        controller.back().and(controller.y()).whileTrue(drivetrain.sysIdDynamic(Direction.kForward));
+        controller.back().and(controller.x()).whileTrue(drivetrain.sysIdDynamic(Direction.kReverse));
+        controller.start().and(controller.y()).whileTrue(drivetrain.sysIdQuasistatic(Direction.kForward));
+        controller.start().and(controller.x()).whileTrue(drivetrain.sysIdQuasistatic(Direction.kReverse));
 
         // Reset the field-centric heading on left bumper press.
-        joystick.leftBumper().onTrue(drivetrain.runOnce(drivetrain::seedFieldCentric));
+        controller.leftBumper().onTrue(drivetrain.runOnce(drivetrain::seedFieldCentric));
 
         drivetrain.registerTelemetry(logger::telemeterize);
     }
