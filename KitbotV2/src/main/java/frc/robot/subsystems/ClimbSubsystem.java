@@ -10,10 +10,10 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
 public class ClimbSubsystem extends SubsystemBase {
     
-    private TalonFX leftClimbMotor = new TalonFX(10000);
+    private TalonFX leftClimbMotor = new TalonFX(60);
     private TalonFXConfiguration leftClimbConfiguration = new TalonFXConfiguration();
 
-    private TalonFX rightClimbMotor = new TalonFX(10001);
+    private TalonFX rightClimbMotor = new TalonFX(61);
     private TalonFXConfiguration rightClimbConfiguration = new TalonFXConfiguration();
 
     public ClimbSubsystem() {

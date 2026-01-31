@@ -6,9 +6,12 @@ package frc.robot;
 
 import static edu.wpi.first.units.Units.*;
 
+import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
 import com.ctre.phoenix6.swerve.SwerveRequest;
 
+import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -16,6 +19,7 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
+import frc.robot.LimelightHelpers.PoseEstimate;
 import frc.robot.commands.ClimbCmd;
 import frc.robot.commands.IntakeCmd;
 import frc.robot.commands.ShootCmd;
@@ -30,6 +34,7 @@ public class RobotContainer {
     private double MaxSpeed = 0.6 * TunerConstants.kSpeedAt12Volts.in(MetersPerSecond); // kSpeedAt12Volts desired top speed
     private double MaxAngularRate = 0.7 * RotationsPerSecond.of(0.75).in(RadiansPerSecond); // 3/4 of a rotation per second max angular velocity
 
+    private PIDController rotationController = new PIDController(0.1,0,0);
     
     private IntakeShooterSubsystem intakeShooterSubsystem = new IntakeShooterSubsystem();
     private DeflectorSubsystem deflectorSubsystem = new DeflectorSubsystem();
@@ -50,6 +55,26 @@ public class RobotContainer {
 
     public final CommandSwerveDrivetrain drivetrain = TunerConstants.createDrivetrain();
 
+    private PoseEstimate llmeasurement;
+    private double rotationControlSignal;
+    private double rotationalRate;
+    private Rotation2d fieldRelativeAngle;
+    private Rotation2d yawInitial;
+    private Rotation2d yawSetpoint;
+    private Pose2d redHubPose = new Pose2d
+    (
+        11.9154194,
+        4.0346376,
+        new Rotation2d(Math.PI/2)
+    );
+
+    private Pose2d blueHubPose = new Pose2d
+    (
+        4.6256194,
+        4.0346376,
+        new Rotation2d(Math.PI/2)
+    );
+
     public RobotContainer() {
         configureBindings();
     }
@@ -60,9 +85,9 @@ public class RobotContainer {
         drivetrain.setDefaultCommand(
             // Drivetrain will execute this command periodically
             drivetrain.applyRequest(() ->
-                drive.withVelocityX(driveJS.getRawAxis(1) * MaxSpeed) // Drive forward with negative Y (forward)
-                    .withVelocityY(driveJS.getRawAxis(0) * MaxSpeed) // Drive left with negative X (left)
-                    .withRotationalRate(-twistJS.getRawAxis(2) * MaxAngularRate) // Drive counterclockwise with negative X (left)
+                drive.withVelocityX(0)//driveJS.getRawAxis(1) * MaxSpeed) // Drive forward with negative Y (forward)
+                    .withVelocityY(0)//driveJS.getRawAxis(0) * MaxSpeed) // Drive left with negative X (left)
+                    .withRotationalRate(calcRotationalRate())
             )
         );
 
@@ -99,6 +124,59 @@ public class RobotContainer {
         drivetrain.registerTelemetry(logger::telemeterize);
     }
 
+    public double calcRotationalRate(){
+        rotationalRate = 0;
+        if(!twistJS.getRawButton(1)){
+            rotationalRate = -twistJS.getRawAxis(2) * MaxAngularRate;
+        }else{
+            rotationalRate = calcRotationControlSignal();
+        }
+        return rotationalRate;
+    }
+
+    public double calcRotationControlSignal(){
+        rotationControlSignal = rotationController.calculate(
+            drivetrain.getState().Pose.getRotation().getDegrees(),//drivetrain.getPigeon2().getYaw().getValueAsDouble() % 360, drivetrain.getState().Pose.getRotation().getDegrees()
+            calcYawSetpointRed().getDegrees()
+        );
+        return -rotationControlSignal;
+    }
+
+    public Rotation2d calcYawSetpointBlue(){
+        llmeasurement = LimelightHelpers.getBotPoseEstimate_wpiBlue("limelight");
+        if(llmeasurement != null && llmeasurement.tagCount > 0){
+            yawInitial = llmeasurement.pose.getRotation();
+            fieldRelativeAngle = new Rotation2d(
+                blueHubPose.getX() - llmeasurement.pose.getX(), 
+                blueHubPose.getY() - llmeasurement.pose.getY()
+            );
+        }else{
+            yawInitial = Rotation2d.fromDegrees(0);
+            fieldRelativeAngle = Rotation2d.fromDegrees(0);
+        }
+        yawSetpoint = fieldRelativeAngle.minus(yawInitial);
+        return yawSetpoint;
+    }
+
+    public Rotation2d calcYawSetpointRed(){
+        llmeasurement = LimelightHelpers.getBotPoseEstimate_wpiRed("limelight");
+        if(llmeasurement != null && llmeasurement.tagCount > 0){
+            yawInitial = llmeasurement.pose.getRotation();
+            fieldRelativeAngle = new Rotation2d(
+                redHubPose.getX() - llmeasurement.pose.getX(), 
+                redHubPose.getY() - llmeasurement.pose.getY()
+            );
+        }else{
+            yawInitial = Rotation2d.fromDegrees(0);
+            fieldRelativeAngle = Rotation2d.fromDegrees(0);
+        }
+        //System.out.println("x: " + llmeasurement.pose.getX());
+        //System.out.println("y: " + llmeasurement.pose.getY());
+
+        yawSetpoint = fieldRelativeAngle.minus(yawInitial);
+        return yawSetpoint;
+        
+    }
     public Command getAutonomousCommand() {
         // Simple drive forward auton
         final var idle = new SwerveRequest.Idle();
