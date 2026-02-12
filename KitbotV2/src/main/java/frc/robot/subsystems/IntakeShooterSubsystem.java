@@ -40,9 +40,15 @@ public class IntakeShooterSubsystem extends SubsystemBase {
         intakeShooterMotor.set(shooterSpeed);
     }
 
+    public void setIntakeShooterSpeed(double speed){
+        intakeShooterMotor.set(speed);
+    }
+
     public void stop(){
         intakeShooterMotor.set(0);
     }
+
+
 
     public double getRPMs(){
         return intakeShooterMotor.getVelocity().getValueAsDouble();

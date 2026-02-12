@@ -6,15 +6,21 @@ import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.subsystems.DeflectorSubsystem;
 import frc.robot.subsystems.IntakeShooterSubsystem;
 
-public class IntakeCmd extends Command{
+public class VariableShootCmd extends Command{
 
     private IntakeShooterSubsystem intakeShooterSubsystem;
     private DeflectorSubsystem deflectorSubsystem;
+    private Supplier<Double> shooterSpeedSupplier, deflectorSpeedSupplier;
+    private double shooterSpeed, deflectorSpeed;
 
+    public VariableShootCmd(IntakeShooterSubsystem intakeShooterSubsystem, DeflectorSubsystem deflectorSubsystem,
+     Supplier<Double> shooterSpeedSupplier, Supplier<Double> deflectorSpeedSupplier){
 
-    public IntakeCmd(IntakeShooterSubsystem intakeShooterSubsystem, DeflectorSubsystem deflectorSubsystem){
         this.intakeShooterSubsystem = intakeShooterSubsystem;
         this.deflectorSubsystem = deflectorSubsystem;
+        this.shooterSpeedSupplier = shooterSpeedSupplier;
+        this.deflectorSpeedSupplier = deflectorSpeedSupplier;
+
         addRequirements(intakeShooterSubsystem, deflectorSubsystem);
     }
 
@@ -27,9 +33,11 @@ public class IntakeCmd extends Command{
     // Called every time the scheduler runs while the command is scheduled.
     @Override
     public void execute() {
-        intakeShooterSubsystem.intake();
-        deflectorSubsystem.intakeDeflection();
+        shooterSpeed = -0.665;//shooterSpeedSupplier.get();
+        deflectorSpeed = 0.32;//deflectorSpeedSupplier.get();
 
+        intakeShooterSubsystem.setIntakeShooterSpeed(shooterSpeed);
+        deflectorSubsystem.setDeflectionSpeed(deflectorSpeed);
     }
 
     // Called once the command ends or is interrupted.

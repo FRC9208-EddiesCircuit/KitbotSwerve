@@ -41,6 +41,10 @@ public class DeflectorSubsystem extends SubsystemBase {
         deflectorMotor.set(shooterSpeed);
     }
 
+    public void setDeflectionSpeed(double speed){
+        deflectorMotor.set(speed);
+    }
+
     public void stop(){
         deflectorMotor.set(0);
     }
