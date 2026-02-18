@@ -86,7 +86,10 @@ public class RobotContainer {
             VecBuilder.fill(0.5, 0.5, Units.degreesToRadians(30))   //These too
         );
     private double rotationControlSignal;
+    private double xRate;
+    private double yRate;
     private double rotationalRate;
+    
     private Rotation2d fieldRelativeAngleMt2;
     private Rotation2d yawInitialMt2;
 
@@ -97,6 +100,11 @@ public class RobotContainer {
     private Optional<Alliance> allianceColor = DriverStation.getAlliance();
     private boolean doRejectUpdate = false;
 
+    private double forwardTargetingSpeed;
+    private double forwardTargetingKP;
+
+    private double rotTargetingSpeed;
+    private double rotTargetingKP;
 
     private Pose2d redHubPose = new Pose2d(
         11.9154194,
@@ -177,12 +185,41 @@ public class RobotContainer {
         controller.start().and(controller.x()).whileTrue(drivetrain.sysIdQuasistatic(Direction.kReverse));
 
         // Reset the field-centric heading on left bumper press.
-         new JoystickButton(twistJS, 2).whileTrue(drivetrain.runOnce(drivetrain::seedFieldCentric));
-
+        new JoystickButton(twistJS, 2).whileTrue(drivetrain.runOnce(drivetrain::seedFieldCentric));
         drivetrain.registerTelemetry(logger::telemeterize);
+    }
+    public void SYSOUT(){
+        System.out.println("X: " + LimelightHelpers.getTargetPose3d_RobotSpace("limelight").getX());
+        System.out.println("Y: " + LimelightHelpers.getTargetPose3d_RobotSpace("limelight").getY());
+        System.out.println("Z: " + LimelightHelpers.getTargetPose3d_RobotSpace("limelight").getZ());
+        System.out.println("R: " + (180/Math.PI) * LimelightHelpers.getTargetPose3d_RobotSpace("limelight").getRotation().getAngle());
+
+    }
+
+    public double calcXRate(){
+        xRate = 0;
+
+        return xRate;
+    }
+    public double calcYRate(){
+        yRate = 0;
+
+        return yRate;
     }
 
     public double calcRotationalRate(){
+        rotationalRate = 0;
+        if(twistJS.getRawButton(1)){
+            rotationalRate = calcRotationControlSignal();   //pose to hub
+
+        }else if(driveJS.getRawButton(1)){           
+            rotationalRate = rotControl();                  //aim and range to tag
+        }else{
+            rotationalRate = -twistJS.getRawAxis(2) * MaxAngularRate;
+        }
+        return rotationalRate;
+    }
+    /*public double calcRotationalRate(){
         rotationalRate = 0;
         if(!twistJS.getRawButton(1)){
             rotationalRate = -twistJS.getRawAxis(2) * MaxAngularRate;
@@ -190,6 +227,19 @@ public class RobotContainer {
             rotationalRate = calcRotationControlSignal();
         }
         return rotationalRate;
+    }*/
+    public double rangeControl(){
+        forwardTargetingSpeed = 
+            LimelightHelpers.getTY("limelight-anarchy") * forwardTargetingKP;
+        forwardTargetingSpeed *= MaxSpeed;
+
+        return forwardTargetingSpeed;
+    }
+    public double rotControl(){
+        rotTargetingSpeed = 
+            LimelightHelpers.getTX("limelight-anarchy") * rotTargetingKP;
+        rotTargetingSpeed *= MaxAngularRate;
+        return rotTargetingSpeed;
     }
 
 
@@ -212,14 +262,14 @@ public class RobotContainer {
         );
 
         yawSetpoint = fieldRelativeAngleMt2.minus(yawInitialMt2);
-        System.out.println(mt2PoseEstimator.getEstimatedPosition().getTranslation().getDistance(hubPose.getTranslation()));
+        //System.out.println(mt2PoseEstimator.getEstimatedPosition().getTranslation().getDistance(hubPose.getTranslation()));
         return yawSetpoint;
-
 
     }
 
     public void updateOdometry(){
-
+        //llmeasurement = LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2("limelight-anarchy");
+        //drivetrain.addVisionMeasurement(llmeasurement.pose, llmeasurement.timestampSeconds, VecBuilder.fill(.7,.7,9999999));
         mt2PoseEstimator.update(
             drivetrain.getPigeon2().getRotation2d(),
             new SwerveModulePosition[]{
