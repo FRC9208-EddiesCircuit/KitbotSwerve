@@ -16,10 +16,15 @@ import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 
 import edu.wpi.first.math.Matrix;
+import edu.wpi.first.math.VecBuilder;
+import edu.wpi.first.math.estimator.PoseEstimator;
+import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.Notifier;
@@ -27,7 +32,7 @@ import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Subsystem;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
-
+import frc.robot.LimelightHelpers;
 import frc.robot.generated.TunerConstants.TunerSwerveDrivetrain;
 
 /**
@@ -56,6 +61,22 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     private final SwerveRequest.SysIdSwerveTranslation m_translationCharacterization = new SwerveRequest.SysIdSwerveTranslation();
     private final SwerveRequest.SysIdSwerveSteerGains m_steerCharacterization = new SwerveRequest.SysIdSwerveSteerGains();
     private final SwerveRequest.SysIdSwerveRotation m_rotationCharacterization = new SwerveRequest.SysIdSwerveRotation();
+
+    private boolean doRejectUpdate = false;
+    private SwerveDrivePoseEstimator mt2PoseEstimator = 
+        new SwerveDrivePoseEstimator(
+            getKinematics(),
+            getPigeon2().getRotation2d(),//TODO
+            new SwerveModulePosition[]{
+                getModule(0).getCachedPosition(),    //FL
+                getModule(1).getCachedPosition(),    //FR
+                getModule(2).getCachedPosition(),    //BL
+                getModule(3).getCachedPosition()     //BR
+            },
+            new Pose2d(),
+            VecBuilder.fill(0.05, 0.05, Units.degreesToRadians(5)), //Figure these out
+            VecBuilder.fill(0.5, 0.5, Units.degreesToRadians(30))   //These too
+        );
 
     /* SysId routine for characterizing translation. This is used to find PID gains for the drive motors. */
     private final SysIdRoutine m_sysIdRoutineTranslation = new SysIdRoutine(
@@ -201,7 +222,7 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
         try {
             var config = RobotConfig.fromGUISettings();
             AutoBuilder.configure(
-                () -> getState().Pose,   // Supplier of current robot pose
+                () -> getPoseEstimator().getEstimatedPosition(),//getState().Pose,   // Supplier of current robot pose
                 this::resetPose,         // Consumer for seeding pose against auto
                 () -> getState().Speeds, // Supplier of current robot speeds
                 // Consumer of ChassisSpeeds and feedforwards to drive the robot
@@ -225,6 +246,42 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
             DriverStation.reportError("Failed to load PathPlanner config and configure AutoBuilder", ex.getStackTrace());
         }
     }
+
+    
+    public void updateOdometry(){
+        mt2PoseEstimator.update(
+            getPigeon2().getRotation2d(),
+            new SwerveModulePosition[]{
+                getModule(0).getCachedPosition(),    //FL
+                getModule(1).getCachedPosition(),    //FR
+                getModule(2).getCachedPosition(),    //BL
+                getModule(3).getCachedPosition()     //BR
+            }
+        );
+
+        LimelightHelpers.SetRobotOrientation("limelight-anarchy", mt2PoseEstimator.getEstimatedPosition().getRotation().getDegrees(), 0, 0, 0, 0, 0);
+        LimelightHelpers.PoseEstimate mt2 = LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2("limelight-anarchy");
+        if(Math.abs(getPigeon2().getAngularVelocityZDevice().getValueAsDouble()) > 720 || mt2.tagCount == 0) // if our angular velocity is greater than 720 degrees per second, ignore vision updates
+        {
+            doRejectUpdate = true;
+        }else{
+            doRejectUpdate = false;
+        }
+
+        if(!doRejectUpdate)
+        {
+
+            mt2PoseEstimator.setVisionMeasurementStdDevs(VecBuilder.fill(.7,.7,9999999));
+            mt2PoseEstimator.addVisionMeasurement(
+                mt2.pose,
+                mt2.timestampSeconds);
+        }
+    }
+
+    public SwerveDrivePoseEstimator getPoseEstimator(){
+        return mt2PoseEstimator;
+    }
+
 
     /**
      * Returns a command that applies the specified control request to this swerve drivetrain.

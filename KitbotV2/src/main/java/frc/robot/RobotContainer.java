@@ -41,6 +41,7 @@ import frc.robot.subsystems.ClimbSubsystem;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.subsystems.DeflectorSubsystem;
 import frc.robot.subsystems.IntakeShooterSubsystem;
+import com.pathplanner.lib.auto.AutoBuilder;
 
 public class RobotContainer {
     private double MaxSpeed = 0.6 * TunerConstants.kSpeedAt12Volts.in(MetersPerSecond); // kSpeedAt12Volts desired top speed
@@ -71,7 +72,7 @@ public class RobotContainer {
     public final CommandSwerveDrivetrain drivetrain = TunerConstants.createDrivetrain();
 
     private PoseEstimate llmeasurement;
-    private SwerveDrivePoseEstimator mt2PoseEstimator = 
+    /*private SwerveDrivePoseEstimator mt2PoseEstimator = 
         new SwerveDrivePoseEstimator(
             drivetrain.getKinematics(),
             drivetrain.getPigeon2().getRotation2d(),//TODO
@@ -84,7 +85,7 @@ public class RobotContainer {
             new Pose2d(),
             VecBuilder.fill(0.05, 0.05, Units.degreesToRadians(5)), //Figure these out
             VecBuilder.fill(0.5, 0.5, Units.degreesToRadians(30))   //These too
-        );
+        );*/
     private double rotationControlSignal;
     private double xRate;
     private double yRate;
@@ -98,7 +99,7 @@ public class RobotContainer {
     private double yawOffset;
     private Pose2d hubPose;
     private Optional<Alliance> allianceColor = DriverStation.getAlliance();
-    private boolean doRejectUpdate = false;
+    //private boolean doRejectUpdate = false;
 
     private double forwardTargetingSpeed;
     private double forwardTargetingKP;
@@ -188,6 +189,7 @@ public class RobotContainer {
         new JoystickButton(twistJS, 2).whileTrue(drivetrain.runOnce(drivetrain::seedFieldCentric));
         drivetrain.registerTelemetry(logger::telemeterize);
     }
+
     public void SYSOUT(){
         System.out.println("X: " + LimelightHelpers.getTargetPose3d_RobotSpace("limelight").getX());
         System.out.println("Y: " + LimelightHelpers.getTargetPose3d_RobotSpace("limelight").getY());
@@ -244,7 +246,7 @@ public class RobotContainer {
 
 
     public double calcRotationControlSignal(){
-        yawCurrent = mt2PoseEstimator.getEstimatedPosition().getRotation().getDegrees();
+        yawCurrent = drivetrain.getPoseEstimator().getEstimatedPosition().getRotation().getDegrees();//mt2PoseEstimator.getEstimatedPosition().getRotation().getDegrees();
         yawOffset = calcYawSetpoint().getDegrees();
         rotationControlSignal = rotationController.calculate(
             yawCurrent,
@@ -255,10 +257,10 @@ public class RobotContainer {
 
     public Rotation2d calcYawSetpoint(){
 
-        yawInitialMt2 = mt2PoseEstimator.getEstimatedPosition().getRotation();
+        yawInitialMt2 = drivetrain.getPoseEstimator().getEstimatedPosition().getRotation();//mt2PoseEstimator.getEstimatedPosition().getRotation();
         fieldRelativeAngleMt2 = new Rotation2d(
-            hubPose.getX() - mt2PoseEstimator.getEstimatedPosition().getX(),
-            hubPose.getY() - mt2PoseEstimator.getEstimatedPosition().getY()
+            hubPose.getX() - drivetrain.getPoseEstimator().getEstimatedPosition().getX(),//mt2PoseEstimator.getEstimatedPosition().getX(),
+            hubPose.getY() - drivetrain.getPoseEstimator().getEstimatedPosition().getY()//mt2PoseEstimator.getEstimatedPosition().getY()
         );
 
         yawSetpoint = fieldRelativeAngleMt2.minus(yawInitialMt2);
@@ -266,8 +268,11 @@ public class RobotContainer {
         return yawSetpoint;
 
     }
-
     public void updateOdometry(){
+        drivetrain.updateOdometry();
+    }
+
+    /*public void updateOdometry(){
         //llmeasurement = LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2("limelight-anarchy");
         //drivetrain.addVisionMeasurement(llmeasurement.pose, llmeasurement.timestampSeconds, VecBuilder.fill(.7,.7,9999999));
         mt2PoseEstimator.update(
@@ -298,7 +303,7 @@ public class RobotContainer {
                 mt2.timestampSeconds);
         }
         
-    }
+    }*/
 
     public Command getAutonomousCommand() {
         // Simple drive forward auton
